@@ -9,8 +9,6 @@ class Token:
 		assert(tt in Token.TOKEN_TYPES)
 		self.ttype = tt
 		self.data = data
-		self.line = 0
-		self.char = 0
 		self.loc = loc
 		self.sourcebuffer = None
 

@@ -18,11 +18,14 @@ class SourceBuffer:
 		self._tokens = []
 		pass
 
+	ESCAPE_CHAR_MAP = {'n': '\n', 'r': '\r', 't': '\t', '\\': '\\', ''}
+	SINGLE_CHAR_TOKENS = {'.', ',', ':', ';', '+', '-', '(', ')', '{', '}', '[', ']', '='}
+	KEYWORDS = {'if', 'then', 'else', 'while', 'do', 'for', 'in', 'function', 'repeat', 'until', 'end'}
+
 	def lex_from_source(self, source):
 		"""
 		Update the buffer to be for a given source string
 		"""
-
 		#init state
 		sourcelen = len(source)
 		self._source = source
@@ -30,24 +33,29 @@ class SourceBuffer:
 		line = 1
 		char = 0
 
+		#get the current point in the source
 		def mark():
-			#get the current point in the source
 			(ptr, line, char)
 
+		#eof
+		def eof():
+			return ptr <= sourcelen
+
+		#for convinience, define a peek function, which peeks, and will
+		#return the empty string if we are at the end of the file.
 		def peek():
-			#for convinience, define a peek function, which peeks, and will
-			#return the empty string if we are at the end of the file.
 			if ptr < sourcelen-1:
 				return source[ptr+1]
 			else:
 				return ''
 
+		#gets the next character, and updates line/char
 		prevmark = None
 		def get():
-			#gets the next character, and updates line/char
 			prevmark = mark()
 			if ptr < sourcelen:
 				c = source[ptr]
+				ptr += 1
 				if c == '\n':
 					line += 1
 					char = 0
@@ -56,6 +64,11 @@ class SourceBuffer:
 				return c
 			else:
 				return ''
+
+		#utility function, add a tokne
+		def pushtoken(tt, start, end):
+			tok = Token(tt, source[start[0]:end[0]], (start, end))
+			tok.sourcebuffer = self
 
 		#main loop
 		while ptr < sourcelen:
@@ -68,16 +81,61 @@ class SourceBuffer:
 				get()
 				while peek().isalnum():
 					get()
+				#output token
 				end = mark()
-
-
-
+				text = source[start[0]:end[0]]
+				pushtoken('Keyword' if (text in KEYWORDS) else 'Ident', start, end)
 
 			elif c.isdigit():
 				#number
+				start = mark()
+				get()
+				while peek().isdigit():
+					get()
+				if peek() == '.':
+					#fractional part
+					get()
+					while peek().isdigit():
+						get()
+				#parse exponent
+				if peek().lower() == 'e':
+					get()
+					if peek() == '+' or peek() == '-':
+						get()
+					while peek().isdigit():
+						get()
+				#output token
+				pushtoken('Number', start, mark())
 
 			elif c == '"' or c == "'":
 				#string constant
+				start = mark()
+				delim = get()
+
+				#wait for a delimeter
+				while peek() != delim:
+					c = get()
+					if eof():
+						raise LexException('Unfinised string', source, mark())
+					if c == '\\':
+						#escape sequence
+						if eof():
+							raise LexException('Unfinisded escape sequence in string', source, mark())
+						if peek() not in ESCAPE_CHAR_MAP:
+							raise LexException('Invalid escape character `%`' % peek(), source, mark())
+						get()
+
+				#get delim, and emit token
+				get()
+				pushtoken('String', start, mark())
+
+			elif c in SINGLE_CHAR_TOKENS:
+				start = mark()
+				get()
+				pushtoken('Symbol', )
+
+
+
 
 
 	def __len__(self):
